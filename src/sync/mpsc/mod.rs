@@ -135,7 +135,7 @@ pub struct UnboundedReceiver<T>(Receiver<T>);
 /// Error type for sending, used when the receiving end of a channel is
 /// dropped
 #[derive(Clone, PartialEq, Eq)]
-pub struct SendError<T>(T);
+pub struct SendError<T>(pub T);
 
 /// Error type returned from `try_send`
 #[derive(Clone, PartialEq, Eq)]
