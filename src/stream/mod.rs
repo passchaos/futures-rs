@@ -40,7 +40,6 @@ mod filter_map;
 mod flatten;
 mod fold;
 mod for_each;
-mod forward;
 mod from_err;
 mod fuse;
 mod future;
@@ -61,18 +60,18 @@ mod take_while;
 mod then;
 mod unfold;
 mod zip;
+mod forward;
 pub use self::and_then::AndThen;
 pub use self::chain::Chain;
 #[allow(deprecated)]
 pub use self::concat::Concat;
 pub use self::concat::Concat2;
-pub use self::empty::{empty, Empty};
+pub use self::empty::{Empty, empty};
 pub use self::filter::Filter;
 pub use self::filter_map::FilterMap;
 pub use self::flatten::Flatten;
 pub use self::fold::Fold;
 pub use self::for_each::ForEach;
-pub use self::forward::Forward;
 pub use self::from_err::FromErr;
 pub use self::fuse::Fuse;
 pub use self::future::StreamFuture;
@@ -82,7 +81,7 @@ pub use self::map::Map;
 pub use self::map_err::MapErr;
 #[allow(deprecated)]
 pub use self::merge::{Merge, MergedItem};
-pub use self::once::{once, Once};
+pub use self::once::{Once, once};
 pub use self::or_else::OrElse;
 pub use self::peek::Peekable;
 pub use self::poll_fn::{poll_fn, PollFn};
@@ -92,9 +91,10 @@ pub use self::skip_while::SkipWhile;
 pub use self::take::Take;
 pub use self::take_while::TakeWhile;
 pub use self::then::Then;
-pub use self::unfold::{unfold, Unfold};
+pub use self::unfold::{Unfold, unfold};
 pub use self::zip::Zip;
-use sink::Sink;
+pub use self::forward::Forward;
+use sink::{Sink};
 
 if_std! {
     use std;
@@ -242,8 +242,7 @@ pub trait Stream {
     /// function panics, panics will be propagated to the caller of `next`.
     #[cfg(feature = "use_std")]
     fn wait(self) -> Wait<Self>
-    where
-        Self: Sized,
+        where Self: Sized
     {
         wait::new(self)
     }
@@ -270,15 +269,12 @@ pub trait Stream {
     /// ```
     #[cfg(feature = "use_std")]
     #[doc(hidden)]
-    #[deprecated(
-        note = "removed without replacement, recommended to use a \
-                local extension trait or function if needed, more \
-                details in https://github.com/rust-lang-nursery/futures-rs/issues/228"
-    )]
+    #[deprecated(note = "removed without replacement, recommended to use a \
+                         local extension trait or function if needed, more \
+                         details in https://github.com/rust-lang-nursery/futures-rs/issues/228")]
     #[allow(deprecated)]
     fn boxed(self) -> BoxStream<Self::Item, Self::Error>
-    where
-        Self: Sized + Send + 'static,
+        where Self: Sized + Send + 'static,
     {
         ::std::boxed::Box::new(self)
     }
@@ -293,8 +289,7 @@ pub trait Stream {
     /// The returned future can be used to compose streams and futures together by
     /// placing everything into the "world of futures".
     fn into_future(self) -> StreamFuture<Self>
-    where
-        Self: Sized,
+        where Self: Sized
     {
         future::new(self)
     }
@@ -319,9 +314,8 @@ pub trait Stream {
     /// let rx = rx.map(|x| x + 3);
     /// ```
     fn map<U, F>(self, f: F) -> Map<Self, F>
-    where
-        F: FnMut(Self::Item) -> U,
-        Self: Sized,
+        where F: FnMut(Self::Item) -> U,
+              Self: Sized
     {
         map::new(self, f)
     }
@@ -346,9 +340,8 @@ pub trait Stream {
     /// let rx = rx.map_err(|()| 3);
     /// ```
     fn map_err<U, F>(self, f: F) -> MapErr<Self, F>
-    where
-        F: FnMut(Self::Error) -> U,
-        Self: Sized,
+        where F: FnMut(Self::Error) -> U,
+              Self: Sized
     {
         map_err::new(self, f)
     }
@@ -377,9 +370,8 @@ pub trait Stream {
     /// let evens = rx.filter(|x| x % 2 == 0);
     /// ```
     fn filter<F>(self, f: F) -> Filter<Self, F>
-    where
-        F: FnMut(&Self::Item) -> bool,
-        Self: Sized,
+        where F: FnMut(&Self::Item) -> bool,
+              Self: Sized
     {
         filter::new(self, f)
     }
@@ -414,9 +406,8 @@ pub trait Stream {
     /// });
     /// ```
     fn filter_map<F, B>(self, f: F) -> FilterMap<Self, F>
-    where
-        F: FnMut(Self::Item) -> Option<B>,
-        Self: Sized,
+        where F: FnMut(Self::Item) -> Option<B>,
+              Self: Sized
     {
         filter_map::new(self, f)
     }
@@ -454,10 +445,9 @@ pub trait Stream {
     /// });
     /// ```
     fn then<F, U>(self, f: F) -> Then<Self, F, U>
-    where
-        F: FnMut(Result<Self::Item, Self::Error>) -> U,
-        U: IntoFuture,
-        Self: Sized,
+        where F: FnMut(Result<Self::Item, Self::Error>) -> U,
+              U: IntoFuture,
+              Self: Sized
     {
         then::new(self, f)
     }
@@ -502,10 +492,9 @@ pub trait Stream {
     /// });
     /// ```
     fn and_then<F, U>(self, f: F) -> AndThen<Self, F, U>
-    where
-        F: FnMut(Self::Item) -> U,
-        U: IntoFuture<Error = Self::Error>,
-        Self: Sized,
+        where F: FnMut(Self::Item) -> U,
+              U: IntoFuture<Error = Self::Error>,
+              Self: Sized
     {
         and_then::new(self, f)
     }
@@ -530,10 +519,9 @@ pub trait Stream {
     /// Note that this function consumes the receiving stream and returns a
     /// wrapped version of it.
     fn or_else<F, U>(self, f: F) -> OrElse<Self, F, U>
-    where
-        F: FnMut(Self::Error) -> U,
-        U: IntoFuture<Item = Self::Item>,
-        Self: Sized,
+        where F: FnMut(Self::Error) -> U,
+              U: IntoFuture<Item = Self::Item>,
+              Self: Sized
     {
         or_else::new(self, f)
     }
@@ -572,8 +560,7 @@ pub trait Stream {
     /// ```
     #[cfg(feature = "use_std")]
     fn collect(self) -> Collect<Self>
-    where
-        Self: Sized,
+        where Self: Sized
     {
         collect::new(self)
     }
@@ -609,9 +596,8 @@ pub trait Stream {
     /// assert_eq!(result.wait(), Ok(vec![7, 8, 9, 4, 5, 6, 1, 2, 3]));
     /// ```
     fn concat2(self) -> Concat2<Self>
-    where
-        Self: Sized,
-        Self::Item: Extend<<<Self as Stream>::Item as IntoIterator>::Item> + IntoIterator + Default,
+        where Self: Sized,
+              Self::Item: Extend<<<Self as Stream>::Item as IntoIterator>::Item> + IntoIterator + Default,
     {
         concat::new2(self)
     }
@@ -647,15 +633,11 @@ pub trait Stream {
     ///
     /// It's important to note that this function will panic if the stream
     /// is empty, which is the reason for its deprecation.
-    #[deprecated(
-        since = "0.1.14",
-        note = "please use `Stream::concat2` instead"
-    )]
+    #[deprecated(since="0.1.14", note="please use `Stream::concat2` instead")]
     #[allow(deprecated)]
     fn concat(self) -> Concat<Self>
-    where
-        Self: Sized,
-        Self::Item: Extend<<<Self as Stream>::Item as IntoIterator>::Item> + IntoIterator,
+        where Self: Sized,
+              Self::Item: Extend<<<Self as Stream>::Item as IntoIterator>::Item> + IntoIterator,
     {
         concat::new(self)
     }
@@ -684,11 +666,10 @@ pub trait Stream {
     /// assert_eq!(sum.wait(), Ok(15));
     /// ```
     fn fold<F, T, Fut>(self, init: T, f: F) -> Fold<Self, F, Fut, T>
-    where
-        F: FnMut(T, Self::Item) -> Fut,
-        Fut: IntoFuture<Item = T>,
-        Self::Error: From<Fut::Error>,
-        Self: Sized,
+        where F: FnMut(T, Self::Item) -> Fut,
+              Fut: IntoFuture<Item = T>,
+              Self::Error: From<Fut::Error>,
+              Self: Sized
     {
         fold::new(self, f, init)
     }
@@ -727,10 +708,9 @@ pub trait Stream {
     /// assert_eq!(result.wait(), Ok(vec![1, 2, 3, 4]));
     /// ```
     fn flatten(self) -> Flatten<Self>
-    where
-        Self::Item: Stream,
-        <Self::Item as Stream>::Error: From<Self::Error>,
-        Self: Sized,
+        where Self::Item: Stream,
+              <Self::Item as Stream>::Error: From<Self::Error>,
+              Self: Sized
     {
         flatten::new(self)
     }
@@ -743,10 +723,9 @@ pub trait Stream {
     /// returns false all future elements will be returned from the underlying
     /// stream.
     fn skip_while<P, R>(self, pred: P) -> SkipWhile<Self, P, R>
-    where
-        P: FnMut(&Self::Item) -> R,
-        R: IntoFuture<Item = bool, Error = Self::Error>,
-        Self: Sized,
+        where P: FnMut(&Self::Item) -> R,
+              R: IntoFuture<Item=bool, Error=Self::Error>,
+              Self: Sized
     {
         skip_while::new(self, pred)
     }
@@ -758,10 +737,9 @@ pub trait Stream {
     /// stream until the `predicate` resolves to `false`. Once one element
     /// returns false it will always return that the stream is done.
     fn take_while<P, R>(self, pred: P) -> TakeWhile<Self, P, R>
-    where
-        P: FnMut(&Self::Item) -> R,
-        R: IntoFuture<Item = bool, Error = Self::Error>,
-        Self: Sized,
+        where P: FnMut(&Self::Item) -> R,
+              R: IntoFuture<Item=bool, Error=Self::Error>,
+              Self: Sized
     {
         take_while::new(self, pred)
     }
@@ -781,10 +759,9 @@ pub trait Stream {
     /// To process each item in the stream and produce another stream instead
     /// of a single future, use `and_then` instead.
     fn for_each<F, U>(self, f: F) -> ForEach<Self, F, U>
-    where
-        F: FnMut(Self::Item) -> U,
-        U: IntoFuture<Item = (), Error = Self::Error>,
-        Self: Sized,
+        where F: FnMut(Self::Item) -> U,
+              U: IntoFuture<Item=(), Error = Self::Error>,
+              Self: Sized
     {
         for_each::new(self, f)
     }
@@ -801,8 +778,7 @@ pub trait Stream {
     /// Note that this function consumes the receiving stream and returns a
     /// wrapped version of it.
     fn from_err<E: From<Self::Error>>(self) -> FromErr<Self, E>
-    where
-        Self: Sized,
+        where Self: Sized,
     {
         from_err::new(self)
     }
@@ -818,8 +794,7 @@ pub trait Stream {
     /// items is reached, are passed through and do not affect the total number
     /// of items taken.
     fn take(self, amt: u64) -> Take<Self>
-    where
-        Self: Sized,
+        where Self: Sized
     {
         take::new(self, amt)
     }
@@ -834,8 +809,7 @@ pub trait Stream {
     /// All errors yielded from underlying stream are passed through and do not
     /// affect the total number of items skipped.
     fn skip(self, amt: u64) -> Skip<Self>
-    where
-        Self: Sized,
+        where Self: Sized
     {
         skip::new(self, amt)
     }
@@ -856,8 +830,7 @@ pub trait Stream {
     /// Also note that as soon as this stream returns `None` it will be dropped
     /// to reclaim resources associated with it.
     fn fuse(self) -> Fuse<Self>
-    where
-        Self: Sized,
+        where Self: Sized
     {
         fuse::new(self)
     }
@@ -882,8 +855,7 @@ pub trait Stream {
     /// assert_eq!(sum, Ok(7));
     /// ```
     fn by_ref(&mut self) -> &mut Self
-    where
-        Self: Sized,
+        where Self: Sized
     {
         self
     }
@@ -923,8 +895,7 @@ pub trait Stream {
     /// ```
     #[cfg(feature = "use_std")]
     fn catch_unwind(self) -> CatchUnwind<Self>
-    where
-        Self: Sized + std::panic::UnwindSafe,
+        where Self: Sized + std::panic::UnwindSafe
     {
         catch_unwind::new(self)
     }
@@ -944,9 +915,8 @@ pub trait Stream {
     /// library is activated, and it is activated by default.
     #[cfg(feature = "use_std")]
     fn buffered(self, amt: usize) -> Buffered<Self>
-    where
-        Self::Item: IntoFuture<Error = <Self as Stream>::Error>,
-        Self: Sized,
+        where Self::Item: IntoFuture<Error = <Self as Stream>::Error>,
+              Self: Sized
     {
         buffered::new(self, amt)
     }
@@ -966,9 +936,8 @@ pub trait Stream {
     /// library is activated, and it is activated by default.
     #[cfg(feature = "use_std")]
     fn buffer_unordered(self, amt: usize) -> BufferUnordered<Self>
-    where
-        Self::Item: IntoFuture<Error = <Self as Stream>::Error>,
-        Self: Sized,
+        where Self::Item: IntoFuture<Error = <Self as Stream>::Error>,
+              Self: Sized
     {
         buffer_unordered::new(self, amt)
     }
@@ -981,9 +950,8 @@ pub trait Stream {
     #[deprecated(note = "functionality provided by `select` now")]
     #[allow(deprecated)]
     fn merge<S>(self, other: S) -> Merge<Self, S>
-    where
-        S: Stream<Error = Self::Error>,
-        Self: Sized,
+        where S: Stream<Error = Self::Error>,
+              Self: Sized,
     {
         merge::new(self, other)
     }
@@ -994,9 +962,8 @@ pub trait Stream {
     /// returns that pair. If an error happens, then that error will be returned
     /// immediately. If either stream ends then the zipped stream will also end.
     fn zip<S>(self, other: S) -> Zip<Self, S>
-    where
-        S: Stream<Error = Self::Error>,
-        Self: Sized,
+        where S: Stream<Error = Self::Error>,
+              Self: Sized,
     {
         zip::new(self, other)
     }
@@ -1021,9 +988,8 @@ pub trait Stream {
     /// assert_eq!(None, chain.next());
     /// ```
     fn chain<S>(self, other: S) -> Chain<Self, S>
-    where
-        S: Stream<Item = Self::Item, Error = Self::Error>,
-        Self: Sized,
+        where S: Stream<Item = Self::Item, Error = Self::Error>,
+              Self: Sized
     {
         chain::new(self, other)
     }
@@ -1032,8 +998,7 @@ pub trait Stream {
     ///
     /// Calling `peek` returns a reference to the next item in the stream.
     fn peekable(self) -> Peekable<Self>
-    where
-        Self: Sized,
+        where Self: Sized
     {
         peek::new(self)
     }
@@ -1060,8 +1025,7 @@ pub trait Stream {
     /// This method will panic of `capacity` is zero.
     #[cfg(feature = "use_std")]
     fn chunks(self, capacity: usize) -> Chunks<Self>
-    where
-        Self: Sized,
+        where Self: Sized
     {
         chunks::new(self, capacity)
     }
@@ -1078,20 +1042,10 @@ pub trait Stream {
     ///
     /// Error are passed through from either stream.
     fn select<S>(self, other: S) -> Select<Self, S>
-    where
-        S: Stream<Item = Self::Item, Error = Self::Error>,
-        Self: Sized,
+        where S: Stream<Item = Self::Item, Error = Self::Error>,
+              Self: Sized,
     {
-        select::new(self, other, false)
-    }
-
-    /// The other stream will be droped when any one of streams is done.
-    fn select_short_circuit<S>(self, other: S) -> Select<Self, S>
-    where
-        S: Stream<Item = Self::Item, Error = Self::Error>,
-        Self: Sized,
-    {
-        select::new(self, other, true)
+        select::new(self, other)
     }
 
     /// A future that completes after the given stream has been fully processed
@@ -1109,10 +1063,9 @@ pub trait Stream {
     ///
     /// On completion, the pair `(stream, sink)` is returned.
     fn forward<S>(self, sink: S) -> Forward<Self, S>
-    where
-        S: Sink<SinkItem = Self::Item>,
-        Self::Error: From<S::SinkError>,
-        Self: Sized,
+        where S: Sink<SinkItem = Self::Item>,
+              Self::Error: From<S::SinkError>,
+              Self: Sized
     {
         forward::new(self, sink)
     }
@@ -1128,8 +1081,7 @@ pub trait Stream {
     /// library is activated, and it is activated by default.
     #[cfg(feature = "use_std")]
     fn split(self) -> (SplitSink<Self>, SplitStream<Self>)
-    where
-        Self: super::sink::Sink + Sized,
+        where Self: super::sink::Sink + Sized
     {
         split::split(self)
     }
@@ -1140,9 +1092,8 @@ pub trait Stream {
     /// library where it allows easily inspecting each value as it passes
     /// through the stream, for example to debug what's going on.
     fn inspect<F>(self, f: F) -> Inspect<Self, F>
-    where
-        F: FnMut(&Self::Item),
-        Self: Sized,
+        where F: FnMut(&Self::Item),
+              Self: Sized,
     {
         inspect::new(self, f)
     }
@@ -1153,9 +1104,8 @@ pub trait Stream {
     /// easily inspecting the error as it passes through the stream, for
     /// example to debug what's going on.
     fn inspect_err<F>(self, f: F) -> InspectErr<Self, F>
-    where
-        F: FnMut(&Self::Error),
-        Self: Sized,
+        where F: FnMut(&Self::Error),
+              Self: Sized,
     {
         inspect_err::new(self, f)
     }
@@ -1182,9 +1132,8 @@ impl<'a, S: ?Sized + Stream> Stream for &'a mut S {
 /// futures into the set as they become available.
 #[cfg(feature = "use_std")]
 pub fn futures_unordered<I>(futures: I) -> FuturesUnordered<<I::Item as IntoFuture>::Future>
-where
-    I: IntoIterator,
-    I::Item: IntoFuture,
+    where I: IntoIterator,
+        I::Item: IntoFuture
 {
     let mut set = FuturesUnordered::new();
 
@@ -1192,5 +1141,5 @@ where
         set.push(future.into_future());
     }
 
-    return set;
+    return set
 }
